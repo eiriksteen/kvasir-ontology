@@ -19,6 +19,7 @@ class AnalysisSectionBase(BaseModel):
     id: UUID
     name: str
     analysis_id: UUID
+    order: int
     description: Optional[str] = None
     created_at: datetime
     updated_at: datetime
@@ -113,19 +114,20 @@ class CodeOutputCreate(BaseModel):
 class CodeCellCreate(BaseModel):
     section_id: UUID
     code: str
-    order: int
+    order: Optional[int] = None
     output: Optional[CodeOutputCreate] = None
 
 
 class MarkdownCellCreate(BaseModel):
     section_id: UUID
     markdown: str
-    order: int
+    order: Optional[int] = None
 
 
 class SectionCreate(BaseModel):
     analysis_id: UUID
-    name: str
+    name: Optional[str] = None
+    order: Optional[int] = None
     description: Optional[str] = None
     code_cells_create: Optional[List[CodeCellCreate]] = None
     markdown_cells_create: Optional[List[MarkdownCellCreate]] = None

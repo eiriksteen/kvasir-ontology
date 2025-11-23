@@ -56,6 +56,14 @@ class AnalysisInterface(ABC):
         pass
 
     @abstractmethod
+    async def delete_cells(self, cell_ids: List[UUID]) -> None:
+        pass
+
+    @abstractmethod
+    async def delete_sections(self, section_ids: List[UUID]) -> None:
+        pass
+
+    @abstractmethod
     async def write_to_analysis_stream(self, run_id: UUID, message: Union[Section, AnalysisCell]) -> None:
         pass
 

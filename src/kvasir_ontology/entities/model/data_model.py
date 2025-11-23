@@ -34,8 +34,6 @@ class ModelImplementationBase(BaseModel):
     task: SUPPORTED_TASK_TYPE
     public: bool
     python_class_name: str
-    description: str
-    user_id: UUID
     source: SUPPORTED_MODEL_SOURCES_TYPE
     training_function_id: UUID
     inference_function_id: UUID
@@ -60,8 +58,8 @@ class ModelFunctionBase(BaseModel):
 class ModelInstantiatedBase(BaseModel):
     id: UUID
     model_id: UUID
-    name: str
     user_id: UUID
+    name: str
     description: str
     config: dict
     weights_save_dir: Optional[str] = None
@@ -111,7 +109,6 @@ class ModelImplementationCreate(BaseModel):
 
 class ModelCreate(BaseModel):
     name: str
-    user_id: UUID
     description: str
     implementation_create: Optional[ModelImplementationCreate] = None
 
@@ -121,7 +118,6 @@ class ModelInstantiatedCreate(BaseModel):
     description: str
     config: dict
     weights_save_dir: Optional[str] = None
-    pipeline_id: Optional[UUID] = None
     model_create: Optional[ModelCreate] = None
     model_id: Optional[UUID] = None
 

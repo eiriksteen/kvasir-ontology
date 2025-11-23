@@ -40,3 +40,7 @@ class ModelInterface(ABC):
     @abstractmethod
     async def delete_model(self, model_id: UUID) -> None:
         pass
+
+    @abstractmethod
+    async def delete_model_instantiated(self, model_instantiated_id: UUID) -> None:
+        pass

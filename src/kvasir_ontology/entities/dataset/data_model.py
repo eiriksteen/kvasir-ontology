@@ -181,6 +181,7 @@ class ObjectGroupCreate(BaseModel):
     """
     name: str
     original_id_name: str
+    dataset_id: uuid.UUID
     description: str
     modality: str
     modality_fields: Union[TimeSeriesGroupCreate, TabularGroupCreate]

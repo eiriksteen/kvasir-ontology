@@ -1,14 +1,10 @@
-from typing import List, Optional
-from uuid import UUID
 import json
+from typing import List, TYPE_CHECKING
+from uuid import UUID
 
-from kvasir_ontology.entities.data_source.data_model import DataSource
-from kvasir_ontology.entities.dataset.data_model import Dataset
-from kvasir_ontology.entities.pipeline.data_model import Pipeline, PipelineRunBase
-from kvasir_ontology.entities.model.data_model import ModelInstantiated
-from kvasir_ontology.entities.analysis.data_model import Analysis, Section, AnalysisCell
-from kvasir_ontology.graph.interface import GraphInterface
-from kvasir_ontology.code.interface import CodeInterface
+
+if TYPE_CHECKING:
+    from kvasir_ontology.ontology import Ontology
 
 
 def _is_simple_value(value) -> bool:
@@ -32,12 +28,11 @@ def _format_complex_field(name: str, value, indent: str = "", content_indent: st
 
 async def _get_connections_description(
     entity_id: UUID,
-    graph_interface: GraphInterface,
-    code_interface: CodeInterface
+    ontology: "Ontology"
 ) -> List[str]:
     result = []
 
-    edges = await graph_interface.get_node_edges(entity_id)
+    edges = await ontology.graph.get_node_edges(entity_id)
 
     inbound_edges = [e for e in edges if e.to_node_id == entity_id]
     outbound_edges = [e for e in edges if e.from_node_id == entity_id]
@@ -49,36 +44,29 @@ async def _get_connections_description(
 
         for edge in inputs_to_show:
             if edge.from_node_type == "data_source":
-                entities = await graph_interface.data_sources.get_data_sources([edge.from_node_id])
-                if entities:
-                    entity_desc = await get_data_source_description(
-                        entities[0], graph_interface, code_interface, include_connections=False)
-                    result.append("    <input>")
-                    for line in entity_desc.split("\n"):
-                        result.append(f"      {line}")
-                    result.append("    </input>")
+                entity_desc = await get_data_source_description(
+                    edge.from_node_id, ontology, include_connections=False)
+                result.append("    <input>")
+                for line in entity_desc.split("\n"):
+                    result.append(f"      {line}")
+                result.append("    </input>")
             elif edge.from_node_type == "dataset":
-                entities = await graph_interface.datasets.get_datasets([edge.from_node_id])
-                if entities:
-                    entity_desc = await get_dataset_description(
-                        entities[0], graph_interface, code_interface, include_connections=False)
-                    result.append("    <input>")
-                    for line in entity_desc.split("\n"):
-                        result.append(f"      {line}")
-                    result.append("    </input>")
+                entity_desc = await get_dataset_description(
+                    edge.from_node_id, ontology, include_connections=False)
+                result.append("    <input>")
+                for line in entity_desc.split("\n"):
+                    result.append(f"      {line}")
+                result.append("    </input>")
             elif edge.from_node_type == "pipeline":
-                entities = await graph_interface.pipelines.get_pipelines([edge.from_node_id])
-                if entities:
-                    entity_desc = await get_pipeline_description(entities[0], graph_interface, code_interface, include_connections=False, include_runs=False)
-                    result.append("    <input>")
-                    for line in entity_desc.split("\n"):
-                        result.append(f"      {line}")
-                    result.append("    </input>")
+                entity_desc = await get_pipeline_description(
+                    edge.from_node_id, ontology, include_connections=False, include_runs=False)
+                result.append("    <input>")
+                for line in entity_desc.split("\n"):
+                    result.append(f"      {line}")
+                result.append("    </input>")
             elif edge.from_node_type == "pipeline_run":
-                run = await graph_interface.pipelines.get_pipeline_run(edge.from_node_id)
-                pipeline = await graph_interface.pipelines.get_pipeline(run.pipeline_id)
                 entity_desc = await get_pipeline_run_description(
-                    run, pipeline, graph_interface, code_interface,
+                    edge.from_node_id, ontology,
                     show_pipeline_description=False,
                     include_connections=False
                 )
@@ -87,22 +75,19 @@ async def _get_connections_description(
                     result.append(f"      {line}")
                 result.append("    </input>")
             elif edge.from_node_type == "model_instantiated":
-                entities = await graph_interface.models.get_models_instantiated([edge.from_node_id])
-                if entities:
-                    entity_desc = await get_model_entity_description(entities[0], graph_interface, code_interface, include_connections=False)
-                    result.append("    <input>")
-                    for line in entity_desc.split("\n"):
-                        result.append(f"      {line}")
-                    result.append("    </input>")
+                entity_desc = await get_model_entity_description(
+                    edge.from_node_id, ontology, include_connections=False)
+                result.append("    <input>")
+                for line in entity_desc.split("\n"):
+                    result.append(f"      {line}")
+                result.append("    </input>")
             elif edge.from_node_type == "analysis":
-                entities = await graph_interface.analyses.get_analyses([edge.from_node_id])
-                if entities:
-                    entity_desc = await get_analysis_description(
-                        entities[0], graph_interface, code_interface, include_connections=False)
-                    result.append("    <input>")
-                    for line in entity_desc.split("\n"):
-                        result.append(f"      {line}")
-                    result.append("    </input>")
+                entity_desc = await get_analysis_description(
+                    edge.from_node_id, ontology, include_connections=False)
+                result.append("    <input>")
+                for line in entity_desc.split("\n"):
+                    result.append(f"      {line}")
+                result.append("    </input>")
 
         result.append("  </inputs>")
 
@@ -113,36 +98,29 @@ async def _get_connections_description(
 
         for edge in outputs_to_show:
             if edge.to_node_type == "data_source":
-                entities = await graph_interface.data_sources.get_data_sources([edge.to_node_id])
-                if entities:
-                    entity_desc = await get_data_source_description(
-                        entities[0], graph_interface, code_interface, include_connections=False)
-                    result.append("    <output>")
-                    for line in entity_desc.split("\n"):
-                        result.append(f"      {line}")
-                    result.append("    </output>")
+                entity_desc = await get_data_source_description(
+                    edge.to_node_id, ontology, include_connections=False)
+                result.append("    <output>")
+                for line in entity_desc.split("\n"):
+                    result.append(f"      {line}")
+                result.append("    </output>")
             elif edge.to_node_type == "dataset":
-                entities = await graph_interface.datasets.get_datasets([edge.to_node_id])
-                if entities:
-                    entity_desc = await get_dataset_description(
-                        entities[0], graph_interface, code_interface, include_connections=False)
-                    result.append("    <output>")
-                    for line in entity_desc.split("\n"):
-                        result.append(f"      {line}")
-                    result.append("    </output>")
+                entity_desc = await get_dataset_description(
+                    edge.to_node_id, ontology, include_connections=False)
+                result.append("    <output>")
+                for line in entity_desc.split("\n"):
+                    result.append(f"      {line}")
+                result.append("    </output>")
             elif edge.to_node_type == "pipeline":
-                entities = await graph_interface.pipelines.get_pipelines([edge.to_node_id])
-                if entities:
-                    entity_desc = await get_pipeline_description(entities[0], graph_interface, code_interface, include_connections=False, include_runs=False)
-                    result.append("    <output>")
-                    for line in entity_desc.split("\n"):
-                        result.append(f"      {line}")
-                    result.append("    </output>")
+                entity_desc = await get_pipeline_description(
+                    edge.to_node_id, ontology, include_connections=False, include_runs=False)
+                result.append("    <output>")
+                for line in entity_desc.split("\n"):
+                    result.append(f"      {line}")
+                result.append("    </output>")
             elif edge.to_node_type == "pipeline_run":
-                run = await graph_interface.pipelines.get_pipeline_run(edge.to_node_id)
-                pipeline = await graph_interface.pipelines.get_pipeline(run.pipeline_id)
                 entity_desc = await get_pipeline_run_description(
-                    run, pipeline, graph_interface, code_interface,
+                    edge.to_node_id, ontology,
                     show_pipeline_description=False,
                     include_connections=False
                 )
@@ -151,29 +129,31 @@ async def _get_connections_description(
                     result.append(f"      {line}")
                 result.append("    </output>")
             elif edge.to_node_type == "model_instantiated":
-                entities = await graph_interface.models.get_models_instantiated([edge.to_node_id])
-                if entities:
-                    entity_desc = await get_model_entity_description(entities[0], graph_interface, code_interface, include_connections=False)
-                    result.append("    <output>")
-                    for line in entity_desc.split("\n"):
-                        result.append(f"      {line}")
-                    result.append("    </output>")
+                entity_desc = await get_model_entity_description(
+                    edge.to_node_id, ontology, include_connections=False)
+                result.append("    <output>")
+                for line in entity_desc.split("\n"):
+                    result.append(f"      {line}")
+                result.append("    </output>")
             elif edge.to_node_type == "analysis":
-                entities = await graph_interface.analyses.get_analyses([edge.to_node_id])
-                if entities:
-                    entity_desc = await get_analysis_description(
-                        entities[0], graph_interface, code_interface, include_connections=False)
-                    result.append("    <output>")
-                    for line in entity_desc.split("\n"):
-                        result.append(f"      {line}")
-                    result.append("    </output>")
+                entity_desc = await get_analysis_description(
+                    edge.to_node_id, ontology, include_connections=False)
+                result.append("    <output>")
+                for line in entity_desc.split("\n"):
+                    result.append(f"      {line}")
+                result.append("    </output>")
 
         result.append("  </outputs>")
 
     return result
 
 
-async def get_data_source_description(data_source: DataSource, graph_interface: GraphInterface, code_interface: CodeInterface, include_connections: bool = True) -> str:
+async def get_data_source_description(entity_id: UUID, ontology: "Ontology", include_connections: bool = True) -> str:
+    data_sources = await ontology.data_sources.get_data_sources([entity_id])
+    if not data_sources:
+        raise ValueError(f"Data source with ID {entity_id} not found")
+    data_source = data_sources[0]
+
     result = [f'<data_source id="{data_source.id}" name="{data_source.name}">']
 
     if data_source.description:
@@ -213,7 +193,7 @@ async def get_data_source_description(data_source: DataSource, graph_interface: 
         result.append("  </additional_variables>")
 
     if include_connections:
-        connections = await _get_connections_description(data_source.id, graph_interface, code_interface)
+        connections = await _get_connections_description(entity_id, ontology)
         result.extend(connections)
 
     result.append("")
@@ -222,7 +202,12 @@ async def get_data_source_description(data_source: DataSource, graph_interface: 
     return "\n".join(result)
 
 
-async def get_dataset_description(dataset: Dataset, graph_interface: GraphInterface, code_interface: CodeInterface, include_connections: bool = True) -> str:
+async def get_dataset_description(entity_id: UUID, ontology: "Ontology", include_connections: bool = True) -> str:
+    datasets = await ontology.datasets.get_datasets([entity_id])
+    if not datasets:
+        raise ValueError(f"Dataset with ID {entity_id} not found")
+    dataset = datasets[0]
+
     result = [f'<dataset id="{dataset.id}" name="{dataset.name}">']
 
     if dataset.description:
@@ -328,7 +313,7 @@ async def get_dataset_description(dataset: Dataset, graph_interface: GraphInterf
         result.append("  </object_groups>")
 
     if include_connections:
-        connections = await _get_connections_description(dataset.id, graph_interface, code_interface)
+        connections = await _get_connections_description(entity_id, ontology)
         result.extend(connections)
 
     result.append("")
@@ -337,7 +322,12 @@ async def get_dataset_description(dataset: Dataset, graph_interface: GraphInterf
     return "\n".join(result)
 
 
-async def get_pipeline_description(pipeline: Pipeline, graph_interface: GraphInterface, code_interface: CodeInterface, include_connections: bool = True, include_runs: bool = True) -> str:
+async def get_pipeline_description(entity_id: UUID, ontology: "Ontology", include_connections: bool = True, include_runs: bool = True) -> str:
+    pipelines = await ontology.pipelines.get_pipelines([entity_id])
+    if not pipelines:
+        raise ValueError(f"Pipeline with ID {entity_id} not found")
+    pipeline = pipelines[0]
+
     result = [f'<pipeline id="{pipeline.id}" name="{pipeline.name}">']
 
     if pipeline.description:
@@ -392,7 +382,7 @@ async def get_pipeline_description(pipeline: Pipeline, graph_interface: GraphInt
         if impl.implementation_script_path:
             result.append(_format_simple_field(
                 'implementation_script_path', impl.implementation_script_path, "    "))
-            code_file = await code_interface.get_codebase_file(impl.implementation_script_path)
+            code_file = await ontology.code.get_codebase_file(impl.implementation_script_path)
             result.append("    <code>")
             for line in code_file.content.split("\n"):
                 result.append(f"      {line}")
@@ -401,7 +391,7 @@ async def get_pipeline_description(pipeline: Pipeline, graph_interface: GraphInt
         result.append("  </implementation>")
 
     if include_connections:
-        connections = await _get_connections_description(pipeline.id, graph_interface, code_interface)
+        connections = await _get_connections_description(entity_id, ontology)
         result.extend(connections)
 
     if include_runs and pipeline.runs:
@@ -409,7 +399,7 @@ async def get_pipeline_description(pipeline: Pipeline, graph_interface: GraphInt
         result.append("  <pipeline_runs>")
         for run in pipeline.runs:
             run_desc = await get_pipeline_run_description(
-                run, pipeline, graph_interface, code_interface,
+                run.id, ontology,
                 show_pipeline_description=False,
                 include_connections=False
             )
@@ -427,13 +417,15 @@ async def get_pipeline_description(pipeline: Pipeline, graph_interface: GraphInt
 
 
 async def get_pipeline_run_description(
-    pipeline_run: PipelineRunBase,
-    pipeline: Pipeline,
-    graph_interface: GraphInterface,
-    code_interface: CodeInterface,
+    run_id: UUID,
+    ontology: "Ontology",
     show_pipeline_description: bool = True,
     include_connections: bool = True
 ) -> str:
+    pipeline_run = await ontology.pipelines.get_pipeline_run(run_id)
+    if not pipeline_run:
+        raise ValueError(f"Pipeline run with ID {run_id} not found")
+
     run_name = pipeline_run.name or f"Run {pipeline_run.id}"
     result = [f'<pipeline_run id="{pipeline_run.id}" name="{run_name}">']
 
@@ -479,7 +471,7 @@ async def get_pipeline_run_description(
         result.append("")
         result.append("  <pipeline>")
         pipeline_desc = await get_pipeline_description(
-            pipeline, graph_interface, code_interface,
+            pipeline_run.pipeline_id, ontology,
             include_connections=False,
             include_runs=False
         )
@@ -488,7 +480,7 @@ async def get_pipeline_run_description(
         result.append("  </pipeline>")
 
     if include_connections:
-        connections = await _get_connections_description(pipeline_run.id, graph_interface, code_interface)
+        connections = await _get_connections_description(run_id, ontology)
         result.extend(connections)
 
     result.append("")
@@ -497,7 +489,12 @@ async def get_pipeline_run_description(
     return "\n".join(result)
 
 
-async def get_model_entity_description(model_entity: ModelInstantiated, graph_interface: GraphInterface, code_interface: CodeInterface, include_connections: bool = True) -> str:
+async def get_model_entity_description(entity_id: UUID, ontology: "Ontology", include_connections: bool = True) -> str:
+    models = await ontology.models.get_models_instantiated([entity_id])
+    if not models:
+        raise ValueError(f"Model instantiated with ID {entity_id} not found")
+    model_entity = models[0]
+
     result = [
         f'<model_instantiated id="{model_entity.id}" name="{model_entity.name}">']
 
@@ -538,9 +535,6 @@ async def get_model_entity_description(model_entity: ModelInstantiated, graph_in
         if model_impl.task:
             result.append(_format_simple_field(
                 'task', model_impl.task, "    "))
-        if model_impl.description:
-            result.extend(_format_complex_field(
-                'description', model_impl.description, "    ", "      "))
         if model_impl.model_class_docstring:
             result.extend(_format_complex_field(
                 'model_class_docstring', model_impl.model_class_docstring, "    ", "      "))
@@ -548,7 +542,7 @@ async def get_model_entity_description(model_entity: ModelInstantiated, graph_in
         if model_impl.implementation_script_path:
             result.append(_format_simple_field(
                 'implementation_script_path', model_impl.implementation_script_path, "    "))
-            code_file = await code_interface.get_codebase_file(model_impl.implementation_script_path)
+            code_file = await ontology.code.get_codebase_file(model_impl.implementation_script_path)
             result.append("    <code>")
             for line in code_file.content.split("\n"):
                 result.append(f"      {line}")
@@ -627,7 +621,7 @@ async def get_model_entity_description(model_entity: ModelInstantiated, graph_in
         result.append("  </model_implementation>")
 
     if include_connections:
-        connections = await _get_connections_description(model_entity.id, graph_interface, code_interface)
+        connections = await _get_connections_description(entity_id, ontology)
         result.extend(connections)
 
     result.append("")
@@ -636,7 +630,12 @@ async def get_model_entity_description(model_entity: ModelInstantiated, graph_in
     return "\n".join(result)
 
 
-async def get_analysis_description(analysis: Analysis, graph_interface: GraphInterface, code_interface: CodeInterface, include_connections: bool = True) -> str:
+async def get_analysis_description(entity_id: UUID, ontology: "Ontology", include_connections: bool = True) -> str:
+    analyses = await ontology.analyses.get_analyses([entity_id])
+    if not analyses:
+        raise ValueError(f"Analysis with ID {entity_id} not found")
+    analysis = analyses[0]
+
     result = [f'<analysis id="{analysis.id}" name="{analysis.name}">']
 
     if analysis.description:
@@ -650,7 +649,7 @@ async def get_analysis_description(analysis: Analysis, graph_interface: GraphInt
         for section in analysis.sections:
             result.append("")
             result.append(
-                f'  <section name="{section.name}" section_id="{section.id}">')
+                f'  <section name="{section.name}" section_id="{section.id}" order="{section.order}">')
 
             if section.description:
                 result.append("    <section_description>")
@@ -661,7 +660,8 @@ async def get_analysis_description(analysis: Analysis, graph_interface: GraphInt
             for cell in sorted(section.cells, key=lambda c: c.order):
                 if cell.type == "markdown":
                     result.append("")
-                    result.append(f'    <markdown name="{cell.id}">')
+                    result.append(
+                        f'    <markdown id="{cell.id} order="{cell.order}">')
                     markdown_content = cell.type_fields.markdown
                     for line in markdown_content.strip().split("\n"):
                         result.append(f"      {line}")
@@ -669,7 +669,8 @@ async def get_analysis_description(analysis: Analysis, graph_interface: GraphInt
 
                 elif cell.type == "code":
                     result.append("")
-                    result.append(f'    <code name="{cell.id}">')
+                    result.append(
+                        f'    <code id="{cell.id}" order="{cell.order}">')
                     code_content = cell.type_fields.code
                     for line in code_content.strip().split("\n"):
                         result.append(f"      {line}")
@@ -689,7 +690,7 @@ async def get_analysis_description(analysis: Analysis, graph_interface: GraphInt
         result.append("  (empty notebook)")
 
     if include_connections:
-        connections = await _get_connections_description(analysis.id, graph_interface, code_interface)
+        connections = await _get_connections_description(entity_id, ontology)
         result.extend(connections)
 
     result.append("")

@@ -69,7 +69,3 @@ class VisualizationInterface(ABC):
     @abstractmethod
     async def download_echart(self, echart_id: UUID, mount_group_id: UUID) -> bytes:
         pass
-
-    @abstractmethod
-    async def get_echart_config(self, echart_id: UUID, mount_group_id: UUID) -> EChartsOption:
-        pass

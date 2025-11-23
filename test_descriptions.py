@@ -32,7 +32,10 @@ from kvasir_ontology.entities.analysis.data_model import (
 from kvasir_ontology.code.interface import CodeInterface
 from kvasir_ontology.code.data_model import CodebaseFile, CodebasePath
 from kvasir_ontology.graph.interface import GraphInterface
-from kvasir_ontology.graph.data_model import EdgeDefinition
+from kvasir_ontology.graph.data_model import (
+    EdgeDefinition, EntityGraph, EntityNode, PipelineNode, EdgePoints,
+    get_entity_graph_description
+)
 from kvasir_ontology.ontology import Ontology
 from kvasir_ontology._description_utils import (
     get_data_source_description,
@@ -94,15 +97,8 @@ class DummyGraphInterface(GraphInterface):
     """Dummy implementation of GraphInterface for testing."""
 
     def __init__(self, user_id: uuid.UUID, edges_map: dict):
-        # Don't call super().__init__() because it tries to instantiate abstract interfaces
-        self.user_id = user_id
+        super().__init__(user_id)
         self.edges_map = edges_map  # Maps entity_id -> List[EdgeDefinition]
-        # Set dummy interfaces to avoid attribute errors
-        self.data_sources = None
-        self.datasets = None
-        self.pipelines = None
-        self.models = None
-        self.analyses = None
 
     async def get_node_edges(self, node_id: uuid.UUID) -> List[EdgeDefinition]:
         """Return edges for a given node."""
@@ -112,14 +108,26 @@ class DummyGraphInterface(GraphInterface):
     async def add_node(self, node):
         pass
 
+    async def add_nodes(self, nodes):
+        pass
+
     async def get_node(self, node_id: uuid.UUID):
         pass
+
+    async def get_nodes(self, node_ids: List[uuid.UUID]):
+        return []
 
     async def delete_node(self, node_id: uuid.UUID) -> None:
         pass
 
-    async def get_node_groups(self, node_id: uuid.UUID):
+    async def update_node_position(self, node_id: uuid.UUID, x_position: float, y_position: float):
+        pass
+
+    async def get_node_groups(self, node_id: uuid.UUID = None, group_ids: List[uuid.UUID] = None):
         return []
+
+    async def get_node_group(self, node_group_id: uuid.UUID):
+        pass
 
     async def create_node_group(self, node_group):
         pass
@@ -137,6 +145,9 @@ class DummyGraphInterface(GraphInterface):
         pass
 
     async def remove_edges(self, edges: List[EdgeDefinition]) -> None:
+        pass
+
+    async def remove_pipeline_run_edges(self, pipeline_run_ids: List[uuid.UUID]) -> None:
         pass
 
     async def get_entity_graph(self, root_group_id=None, root_node_id=None):
@@ -158,6 +169,7 @@ def create_dummy_data_source() -> DataSource:
             "notes": "Data has been validated and cleaned"
         },
         created_at=now,
+        updated_at=now,
         type_fields=FileDataSourceBase(
             id=uuid.uuid4(),
             file_name="sales_data.csv",
@@ -442,6 +454,7 @@ def create_dummy_analysis() -> Analysis:
     # Create section
     section = Section(
         id=uuid.uuid4(),
+        order=0,
         name="Temperature Analysis",
         analysis_id=uuid.uuid4(),
         description="Analysis of temperature trends and statistics",
@@ -633,43 +646,297 @@ async def main():
     print("\n" + "=" * 80)
     print("DATA SOURCE DESCRIPTION")
     print("=" * 80)
-    print(await get_data_source_description(data_source, ontology))
+    print(await get_data_source_description(data_source.id, ontology))
 
     # Test Dataset
     print("\n" + "=" * 80)
     print("DATASET DESCRIPTION")
     print("=" * 80)
-    print(await get_dataset_description(dataset, ontology))
+    print(await get_dataset_description(dataset.id, ontology))
 
     # Test Pipeline
     print("\n" + "=" * 80)
     print("PIPELINE DESCRIPTION")
     print("=" * 80)
-    print(await get_pipeline_description(pipeline, ontology))
+    print(await get_pipeline_description(pipeline.id, ontology))
 
     # Test Model Instantiated
     print("\n" + "=" * 80)
     print("MODEL ENTITY DESCRIPTION")
     print("=" * 80)
-    print(await get_model_entity_description(model_entity, ontology))
+    print(await get_model_entity_description(model_entity.id, ontology))
 
     # Test Analysis
     print("\n" + "=" * 80)
     print("ANALYSIS DESCRIPTION")
     print("=" * 80)
-    print(await get_analysis_description(analysis, ontology))
+    print(await get_analysis_description(analysis.id, ontology))
 
     # Test Pipeline with Runs (should show runs nested)
     print("\n" + "=" * 80)
     print("PIPELINE DESCRIPTION WITH RUNS")
     print("=" * 80)
-    print(await get_pipeline_description(pipeline, ontology, include_runs=True))
+    print(await get_pipeline_description(pipeline.id, ontology, include_runs=True))
 
     # Test Pipeline Run directly (should show inputs/outputs and pipeline description)
     print("\n" + "=" * 80)
     print("PIPELINE RUN DESCRIPTION (DIRECT)")
     print("=" * 80)
-    print(await get_pipeline_run_description(pipeline_runs[0], pipeline, ontology, show_pipeline_description=True, include_connections=True))
+    print(await get_pipeline_run_description(pipeline_runs[0].id, ontology, show_pipeline_description=True, include_connections=True))
+
+    # Test Entity Graph Description
+    print("\n" + "=" * 80)
+    print("ENTITY GRAPH DESCRIPTION")
+    print("=" * 80)
+
+    # Create an extensive entity graph with multiple connections
+    # Data Sources
+    weather_api_id = uuid.uuid4()
+    sales_db_id = uuid.uuid4()
+
+    # Datasets
+    weather_q1_id = uuid.uuid4()
+    weather_q2_id = uuid.uuid4()
+    sales_data_id = uuid.uuid4()
+    cleaned_weather_id = uuid.uuid4()
+
+    # Pipelines
+    cleaning_pipeline_id = uuid.uuid4()
+    forecasting_pipeline_id = uuid.uuid4()
+
+    # Pipeline Runs
+    cleaning_run_1_id = uuid.uuid4()
+    cleaning_run_2_id = uuid.uuid4()
+    forecasting_run_1_id = uuid.uuid4()
+
+    # Models
+    lstm_model_id = uuid.uuid4()
+    transformer_model_id = uuid.uuid4()
+
+    # Analyses
+    temp_analysis_id = uuid.uuid4()
+    sales_analysis_id = uuid.uuid4()
+    forecast_analysis_id = uuid.uuid4()
+
+    now = datetime.now(timezone.utc)
+
+    # Data Sources
+    weather_api_node = EntityNode(
+        id=weather_api_id,
+        name="Weather API",
+        description="External API providing real-time weather data from NOAA",
+        x_position=100.0,
+        y_position=100.0,
+        from_entities=EdgePoints(),
+        to_entities=EdgePoints(datasets=[weather_q1_id, weather_q2_id])
+    )
+
+    sales_db_node = EntityNode(
+        id=sales_db_id,
+        name="Sales Database",
+        description="PostgreSQL database containing sales transactions",
+        x_position=100.0,
+        y_position=300.0,
+        from_entities=EdgePoints(),
+        to_entities=EdgePoints(datasets=[sales_data_id])
+    )
+
+    # Datasets
+    weather_q1_node = EntityNode(
+        id=weather_q1_id,
+        name="Weather Dataset Q1 2024",
+        description="Quarterly weather data aggregated from API for Q1",
+        x_position=300.0,
+        y_position=100.0,
+        from_entities=EdgePoints(data_sources=[weather_api_id]),
+        to_entities=EdgePoints(
+            pipelines=[cleaning_pipeline_id], analyses=[temp_analysis_id])
+    )
+
+    weather_q2_node = EntityNode(
+        id=weather_q2_id,
+        name="Weather Dataset Q2 2024",
+        description="Quarterly weather data aggregated from API for Q2",
+        x_position=300.0,
+        y_position=150.0,
+        from_entities=EdgePoints(data_sources=[weather_api_id]),
+        to_entities=EdgePoints(pipelines=[cleaning_pipeline_id])
+    )
+
+    sales_data_node = EntityNode(
+        id=sales_data_id,
+        name="Sales Dataset 2024",
+        description="Complete sales transaction data for 2024",
+        x_position=300.0,
+        y_position=300.0,
+        from_entities=EdgePoints(data_sources=[sales_db_id]),
+        to_entities=EdgePoints(analyses=[sales_analysis_id])
+    )
+
+    cleaned_weather_node = EntityNode(
+        id=cleaned_weather_id,
+        name="Cleaned Weather Dataset",
+        description="Processed and cleaned weather data ready for analysis",
+        x_position=500.0,
+        y_position=125.0,
+        from_entities=EdgePoints(),
+        to_entities=EdgePoints(pipelines=[forecasting_pipeline_id], analyses=[
+                               forecast_analysis_id])
+    )
+
+    # Pipeline Runs
+    cleaning_run_1_node = EntityNode(
+        id=cleaning_run_1_id,
+        name="Cleaning Run 2024-01-15",
+        description="First execution of data cleaning pipeline",
+        x_position=700.0,
+        y_position=100.0,
+        from_entities=EdgePoints(datasets=[weather_q1_id]),
+        to_entities=EdgePoints(datasets=[cleaned_weather_id])
+    )
+
+    cleaning_run_2_node = EntityNode(
+        id=cleaning_run_2_id,
+        name="Cleaning Run 2024-04-15",
+        description="Second execution of data cleaning pipeline",
+        x_position=700.0,
+        y_position=150.0,
+        from_entities=EdgePoints(datasets=[weather_q2_id]),
+        to_entities=EdgePoints()
+    )
+
+    forecasting_run_1_node = EntityNode(
+        id=forecasting_run_1_id,
+        name="Forecasting Run 2024-06-01",
+        description="Execution of forecasting pipeline with LSTM model",
+        x_position=900.0,
+        y_position=125.0,
+        from_entities=EdgePoints(
+            datasets=[cleaned_weather_id], models_instantiated=[lstm_model_id]),
+        to_entities=EdgePoints()
+    )
+
+    # Pipelines
+    cleaning_pipeline_node = PipelineNode(
+        id=cleaning_pipeline_id,
+        name="Data Cleaning Pipeline",
+        description="Pipeline for cleaning and preprocessing weather data",
+        x_position=500.0,
+        y_position=100.0,
+        from_entities=EdgePoints(datasets=[weather_q1_id, weather_q2_id]),
+        runs=[cleaning_run_1_node, cleaning_run_2_node]
+    )
+
+    forecasting_pipeline_node = PipelineNode(
+        id=forecasting_pipeline_id,
+        name="Weather Forecasting Pipeline",
+        description="Pipeline for generating weather forecasts using ML models",
+        x_position=700.0,
+        y_position=125.0,
+        from_entities=EdgePoints(
+            datasets=[cleaned_weather_id], models_instantiated=[lstm_model_id]),
+        runs=[forecasting_run_1_node]
+    )
+
+    # Models
+    lstm_model_node = EntityNode(
+        id=lstm_model_id,
+        name="LSTM Forecasting Model",
+        description="LSTM neural network model for weather forecasting",
+        x_position=500.0,
+        y_position=50.0,
+        from_entities=EdgePoints(),
+        to_entities=EdgePoints(pipelines=[forecasting_pipeline_id], analyses=[
+                               forecast_analysis_id])
+    )
+
+    transformer_model_node = EntityNode(
+        id=transformer_model_id,
+        name="Transformer Model v3",
+        description="Transformer-based model for advanced forecasting",
+        x_position=500.0,
+        y_position=0.0,
+        from_entities=EdgePoints(),
+        to_entities=EdgePoints()
+    )
+
+    # Analyses
+    temp_analysis_node = EntityNode(
+        id=temp_analysis_id,
+        name="Temperature Trend Analysis",
+        description="Analysis of temperature trends and patterns in Q1 data",
+        x_position=300.0,
+        y_position=200.0,
+        from_entities=EdgePoints(datasets=[weather_q1_id]),
+        to_entities=EdgePoints()
+    )
+
+    sales_analysis_node = EntityNode(
+        id=sales_analysis_id,
+        name="Sales Performance Analysis",
+        description="Comprehensive analysis of sales performance and trends",
+        x_position=300.0,
+        y_position=350.0,
+        from_entities=EdgePoints(datasets=[sales_data_id]),
+        to_entities=EdgePoints()
+    )
+
+    forecast_analysis_node = EntityNode(
+        id=forecast_analysis_id,
+        name="Forecast Accuracy Analysis",
+        description="Analysis of forecast accuracy using LSTM model predictions",
+        x_position=700.0,
+        y_position=200.0,
+        from_entities=EdgePoints(
+            datasets=[cleaned_weather_id], models_instantiated=[lstm_model_id]),
+        to_entities=EdgePoints()
+    )
+
+    # Create entity graph
+    entity_graph = EntityGraph(
+        data_sources=[weather_api_node, sales_db_node],
+        datasets=[weather_q1_node, weather_q2_node,
+                  sales_data_node, cleaned_weather_node],
+        pipelines=[cleaning_pipeline_node, forecasting_pipeline_node],
+        analyses=[temp_analysis_node,
+                  sales_analysis_node, forecast_analysis_node],
+        models_instantiated=[lstm_model_node, transformer_model_node]
+    )
+
+    # Generate and print description WITHOUT positions (default)
+    print("\n" + "-" * 80)
+    print("GRAPH DESCRIPTION (WITHOUT POSITIONS - DEFAULT)")
+    print("-" * 80)
+    graph_description_no_pos = get_entity_graph_description(
+        entity_graph, include_positions=False)
+    print(graph_description_no_pos)
+
+    # Verify that position, x_position, and y_position are NOT in the YAML when include_positions=False
+    assert "position:" not in graph_description_no_pos, "position should not be in the description when include_positions=False"
+    assert "x_position" not in graph_description_no_pos, "x_position should not be in the description when include_positions=False"
+    assert "y_position" not in graph_description_no_pos, "y_position should not be in the description when include_positions=False"
+    assert "entities:" in graph_description_no_pos, "entities section should be present"
+    assert "graph:" in graph_description_no_pos, "graph section should be present"
+
+    print("\n✓ Graph description without positions generated successfully")
+
+    # Generate and print description WITH positions
+    print("\n" + "-" * 80)
+    print("GRAPH DESCRIPTION (WITH POSITIONS)")
+    print("-" * 80)
+    graph_description_with_pos = get_entity_graph_description(
+        entity_graph, include_positions=True)
+    print(graph_description_with_pos)
+
+    # Verify that position field IS in the YAML when include_positions=True
+    assert "position:" in graph_description_with_pos, "position should be in the description when include_positions=True"
+    # Verify that x_position and y_position are NOT in the YAML (they should be replaced by position)
+    assert "x_position" not in graph_description_with_pos, "x_position should not be in the description when include_positions=True (should use position instead)"
+    assert "y_position" not in graph_description_with_pos, "y_position should not be in the description when include_positions=True (should use position instead)"
+    assert "entities:" in graph_description_with_pos, "entities section should be present"
+    assert "graph:" in graph_description_with_pos, "graph section should be present"
+
+    print("\n✓ Graph description with positions generated successfully")
 
     print("\n" + "=" * 80)
     print("ALL TESTS COMPLETE")

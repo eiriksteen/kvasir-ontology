@@ -12,24 +12,11 @@ from kvasir_ontology.graph.data_model import (
     EntityNode
 )
 
-from kvasir_ontology.entities.data_source.interface import DataSourceInterface
-from kvasir_ontology.entities.dataset.interface import DatasetInterface
-from kvasir_ontology.entities.pipeline.interface import PipelineInterface
-from kvasir_ontology.entities.model.interface import ModelInterface
-from kvasir_ontology.entities.analysis.interface import AnalysisInterface
-
 
 class GraphInterface(ABC):
 
     def __init__(self, user_id: UUID):
-
         self.user_id = user_id
-        # Init these in child classes
-        self.data_sources: Optional[DataSourceInterface] = None
-        self.datasets: Optional[DatasetInterface] = None
-        self.pipelines: Optional[PipelineInterface] = None
-        self.models: Optional[ModelInterface] = None
-        self.analyses: Optional[AnalysisInterface] = None
 
     @abstractmethod
     async def add_node(self, node: EntityNodeCreate) -> EntityNode:
@@ -89,6 +76,10 @@ class GraphInterface(ABC):
 
     @abstractmethod
     async def remove_edges(self, edges: List[EdgeDefinition]) -> None:
+        pass
+
+    @abstractmethod
+    async def remove_pipeline_run_edges(self, pipeline_run_ids: List[UUID]) -> None:
         pass
 
     @abstractmethod

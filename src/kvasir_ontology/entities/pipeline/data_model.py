@@ -13,7 +13,7 @@ class PipelineBase(BaseModel):
     id: UUID
     user_id: UUID
     name: str
-    description: str
+    description: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 
@@ -22,7 +22,7 @@ class PipelineImplementationBase(BaseModel):
     id: UUID
     python_function_name: str
     docstring: str
-    description: str
+    description: Optional[str] = None
     args_schema: dict
     default_args: dict
     output_variables_schema: dict

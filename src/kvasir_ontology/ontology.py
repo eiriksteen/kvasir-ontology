@@ -65,68 +65,44 @@ class Ontology:
         analyses = await self.analyses.get_analyses(entity_ids)
         return data_sources + datasets + pipelines + models_instantiated + analyses
 
-    async def describe_entity_graph(self) -> str:
-        entity_graph = await self.get_entity_graph()
-        return get_entity_graph_description(entity_graph)
-
     async def describe_entity(self, entity_id: UUID, entity_type: NODE_TYPE_LITERAL, include_connections: bool = True) -> str:
         if entity_type == "data_source":
-            data_sources = await self.data_sources.get_data_sources([entity_id])
-            if not data_sources:
-                raise ValueError(f"Data source with ID {entity_id} not found")
-            return await get_data_source_description(data_sources[0], self.graph, self.code, include_connections=include_connections)
+            return await get_data_source_description(entity_id, self, include_connections=include_connections)
 
         if entity_type == "dataset":
-            datasets = await self.datasets.get_datasets([entity_id])
-            if not datasets:
-                raise ValueError(f"Dataset with ID {entity_id} not found")
-            return await get_dataset_description(datasets[0], self.graph, self.code, include_connections=include_connections)
+            return await get_dataset_description(entity_id, self, include_connections=include_connections)
 
         if entity_type == "pipeline":
-            pipelines = await self.pipelines.get_pipelines([entity_id])
-            if not pipelines:
-                raise ValueError(f"Pipeline with ID {entity_id} not found")
-            return await get_pipeline_description(pipelines[0], self.graph, self.code, include_connections=include_connections)
+            return await get_pipeline_description(entity_id, self, include_connections=include_connections)
 
         if entity_type == "model_instantiated":
-            models_instantiated = await self.models.get_models_instantiated([entity_id])
-            if not models_instantiated:
-                raise ValueError(
-                    f"Model instantiated with ID {entity_id} not found")
-            return await get_model_entity_description(models_instantiated[0], self.graph, self.code, include_connections=include_connections)
+            return await get_model_entity_description(entity_id, self, include_connections=include_connections)
 
         if entity_type == "analysis":
-            analyses = await self.analyses.get_analyses([entity_id])
-            if not analyses:
-                raise ValueError(f"Analysis with ID {entity_id} not found")
-            return await get_analysis_description(analyses[0], self.graph, self.code, include_connections=include_connections)
+            return await get_analysis_description(entity_id, self, include_connections=include_connections)
 
         if entity_type == "pipeline_run":
-            pipeline_run = await self.pipelines.get_pipeline_run(entity_id)
-            if not pipeline_run:
-                raise ValueError(f"Pipeline run with ID {entity_id} not found")
-            pipeline = await self.pipelines.get_pipeline(pipeline_run.pipeline_id)
             return await get_pipeline_run_description(
-                pipeline_run, pipeline, self.graph, self.code,
+                entity_id, self,
                 show_pipeline_description=True,
                 include_connections=include_connections
             )
 
-    async def describe_mount_group(self) -> str:
+    async def describe_mount_group(self, include_positions: bool = False) -> str:
         mount_group = await self.graph.get_node_group(self.mount_group_id)
         if not mount_group:
             raise RuntimeError(
                 f"No mount group found for ID: {self.mount_group_id}")
 
-        entity_graph_description = await self.describe_entity_graph()
+        entity_graph = await self.get_entity_graph()
+        entity_graph_description = get_entity_graph_description(
+            entity_graph, include_positions=include_positions)
 
         desc = (
-            f"Name: {mount_group.name}\n" +
-            f"Description: {mount_group.description}\n" +
-            f"Python Package Name: {mount_group.python_package_name}\n" +
-            f"Entity Graph:\n\n{entity_graph_description}"
+            f"<mount_group id=\"{self.mount_group_id}\" name=\"{mount_group.name}\" description=\"{mount_group.description}\" python_package_name=\"{mount_group.python_package_name}\">\n\n" +
+            f"<entity_graph>\n\n{entity_graph_description}\n\n</entity_graph>" +
+            "\n\n</mount_group>"
         )
-
         return desc
 
     async def describe_entities(self, entity_ids: List[UUID], include_connections: bool = True) -> str:
@@ -154,9 +130,21 @@ class Ontology:
                 description = await self.describe_entity(entity_id, entity_type, include_connections)
                 entity_descriptions.append(description)
 
-        return "\n\n".join(entity_descriptions)
+        final_out = (
+            "<entity_descriptions>\n\n" +
+            "\n\n".join(entity_descriptions) +
+            "\n\n</entity_descriptions>"
+        )
 
-    async def insert_data_source(self, data_source: DataSourceCreate, edges: List[EdgeDefinition]) -> DataSource:
+        return final_out
+
+    async def insert_data_source(
+        self,
+        data_source: DataSourceCreate,
+        edges: List[EdgeDefinition],
+        x_position: float = 400,
+        y_position: float = 400,
+    ) -> DataSource:
 
         data_source_obj = await self.data_sources.create_data_source(data_source)
         await self.graph.add_node(EntityNodeCreate(
@@ -164,14 +152,20 @@ class Ontology:
             name=data_source_obj.name,
             entity_type="data_source",
             node_groups=[self.mount_group_id],
-            x_position=400,
-            y_position=400,
+            x_position=x_position,
+            y_position=y_position,
         ))
         await self.graph.create_edges(edges)
 
         return data_source_obj
 
-    async def insert_dataset(self, dataset: DatasetCreate, edges: List[EdgeDefinition]) -> Dataset:
+    async def insert_dataset(
+        self,
+        dataset: DatasetCreate,
+        edges: List[EdgeDefinition],
+        x_position: float = 500,
+        y_position: float = 400,
+    ) -> Dataset:
 
         dataset_obj = await self.datasets.create_dataset(dataset)
         await self.graph.add_node(EntityNodeCreate(
@@ -179,14 +173,20 @@ class Ontology:
             name=dataset_obj.name,
             entity_type="dataset",
             node_groups=[self.mount_group_id],
-            x_position=500,
-            y_position=400,
+            x_position=x_position,
+            y_position=y_position,
         ))
         await self.graph.create_edges(edges)
 
         return dataset_obj
 
-    async def insert_analysis(self, analysis: AnalysisCreate, edges: List[EdgeDefinition]) -> Analysis:
+    async def insert_analysis(
+        self,
+        analysis: AnalysisCreate,
+        edges: List[EdgeDefinition],
+        x_position: float = 600,
+        y_position: float = 400,
+    ) -> Analysis:
 
         analysis_obj = await self.analyses.create_analysis(analysis)
         await self.graph.add_node(EntityNodeCreate(
@@ -194,14 +194,20 @@ class Ontology:
             name=analysis_obj.name,
             entity_type="analysis",
             node_groups=[self.mount_group_id],
-            x_position=600,
-            y_position=400,
+            x_position=x_position,
+            y_position=y_position,
         ))
         await self.graph.create_edges(edges)
 
         return analysis_obj
 
-    async def insert_pipeline(self, pipeline: PipelineCreate, edges: List[EdgeDefinition]) -> Pipeline:
+    async def insert_pipeline(
+        self,
+        pipeline: PipelineCreate,
+        edges: List[EdgeDefinition],
+        x_position: float = 700,
+        y_position: float = 400,
+    ) -> Pipeline:
 
         pipeline_obj = await self.pipelines.create_pipeline(pipeline)
         await self.graph.add_node(EntityNodeCreate(
@@ -209,14 +215,20 @@ class Ontology:
             name=pipeline_obj.name,
             entity_type="pipeline",
             node_groups=[self.mount_group_id],
-            x_position=700,
-            y_position=400,
+            x_position=x_position,
+            y_position=y_position,
         ))
         await self.graph.create_edges(edges)
 
         return pipeline_obj
 
-    async def insert_model_instantiated(self, model_instantiated: ModelInstantiatedCreate, edges: List[EdgeDefinition]) -> ModelInstantiated:
+    async def insert_model_instantiated(
+        self,
+        model_instantiated: ModelInstantiatedCreate,
+        edges: List[EdgeDefinition],
+        x_position: float = 800,
+        y_position: float = 400,
+    ) -> ModelInstantiated:
 
         model_instantiated_obj = await self.models.create_model_instantiated(model_instantiated)
         await self.graph.add_node(EntityNodeCreate(
@@ -224,8 +236,8 @@ class Ontology:
             name=model_instantiated_obj.name,
             entity_type="model_instantiated",
             node_groups=[self.mount_group_id],
-            x_position=800,
-            y_position=400,
+            x_position=x_position,
+            y_position=y_position,
         ))
         await self.graph.create_edges(edges)
 
@@ -265,6 +277,11 @@ class Ontology:
         await self.analyses.delete_analysis(analysis_id)
 
     async def delete_pipeline(self, pipeline_id: UUID) -> None:
+        pipeline_runs = await self.pipelines.get_pipeline_runs(pipeline_ids=[pipeline_id])
+        pipeline_run_ids = [run.id for run in pipeline_runs]
+
+        if pipeline_run_ids:
+            await self.graph.remove_pipeline_run_edges(pipeline_run_ids)
 
         all_edges = await self.graph.get_node_edges(pipeline_id)
         if all_edges:
@@ -275,16 +292,16 @@ class Ontology:
         await self.graph.delete_node(pipeline_id)
         await self.pipelines.delete_pipeline(pipeline_id)
 
-    async def delete_model(self, model_id: UUID) -> None:
+    async def delete_model_instantiated(self, model_instantiated_id: UUID) -> None:
 
-        all_edges = await self.graph.get_node_edges(model_id)
+        all_edges = await self.graph.get_node_edges(model_instantiated_id)
         if all_edges:
             await self.graph.remove_edges(all_edges)
-        node_groups = await self.graph.get_node_groups(model_id)
+        node_groups = await self.graph.get_node_groups(model_instantiated_id)
         if node_groups:
-            await self.graph.remove_nodes_from_groups([model_id], [group.id for group in node_groups])
-        await self.graph.delete_node(model_id)
-        await self.models.delete_model(model_id)
+            await self.graph.remove_nodes_from_groups([model_instantiated_id], [group.id for group in node_groups])
+        await self.graph.delete_node(model_instantiated_id)
+        await self.models.delete_model_instantiated(model_instantiated_id)
 
     async def get_mounted_data_sources(self) -> List[DataSource]:
         entity_graph = await self.get_entity_graph()
@@ -335,3 +352,6 @@ class Ontology:
         )
         await self.graph.create_edges(edges)
         return file_objs, file_paths
+
+    async def describe_analysis(self, analysis_obj: Analysis, include_connections: bool = True) -> str:
+        return await get_analysis_description(analysis_obj.id, self, include_connections=include_connections)
